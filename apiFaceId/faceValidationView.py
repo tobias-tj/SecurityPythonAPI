@@ -1,19 +1,33 @@
 import face_recognition
 import numpy as np
 import os
+import jwt
+from django.conf import settings
 from django.http import JsonResponse
 from rest_framework.views import APIView
 from .models import Face
+from jwt.exceptions import InvalidTokenError
+
 
 class FaceValidationView(APIView):
 
     def post(self, request):
         # Verificar si se han proporcionado la imagen y el documento de identidad
-        if 'image' not in request.FILES or 'document_id' not in request.data:
+        if 'image' not in request.FILES or 'token' not in request.data:
             return JsonResponse({'error': 'No se han proporcionado una imagen o un documento de identidad.'}, status=400)
 
         image_file = request.FILES['image']
-        document_id = request.data['document_id']
+        token = request.data['token']
+
+        # Decodificar el token para obtener el document_id
+        try:
+            decoded_token = jwt.decode(token, settings.JWT_PRIVATE_KEY, algorithms=["HS256"])
+            document_id = decoded_token.get("userId")
+            print(document_id)
+            if not document_id:
+                return JsonResponse({'error': 'El token no contiene el documento de identidad.'}, status=401)
+        except InvalidTokenError:
+            return JsonResponse({'error': 'Token inválido o expirado.'}, status=401)
 
         try:
             # Cargar la imagen y codificar la cara
