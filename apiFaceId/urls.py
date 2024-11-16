@@ -19,6 +19,7 @@ from django.urls import path
 
 from .faceCreateView import FaceCreateView
 from .faceValidationView import FaceValidationView
+from .proctoringExamView import ProctoringView
 from .views import FaceRecognitionView
 from django.conf import settings
 from django.conf.urls.static import static
@@ -28,7 +29,7 @@ urlpatterns = [
     path('detect-face/', FaceRecognitionView.as_view(), name='detect-face'),
     path('create-face/', FaceCreateView.as_view(), name='create-face'),
     path('validation-face/', FaceValidationView.as_view(), name='validation-face'),
-
+    path('proctoring-exam/', ProctoringView.as_view(), name= 'proctoring-exam')
 ]
 
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
