@@ -11,6 +11,9 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 import os
 from pathlib import Path
+from os import getenv
+from urllib.parse import urlparse
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -27,6 +30,9 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+load_dotenv()
+
+tmpPostgres = urlparse(os.getenv("DATABASE_URL"))
 
 # Application definition
 
@@ -82,10 +88,18 @@ WSGI_APPLICATION = 'apiFaceId.wsgi.application'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
 DATABASES = {
-    'default': {
+    'default': { # Base de datos local
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    },
+    'neon': {  # Base de datos Neon
+         'ENGINE': 'django.db.backends.postgresql',
+        'NAME': tmpPostgres.path.replace('/', ''),
+        'USER': tmpPostgres.username,
+        'PASSWORD': tmpPostgres.password,
+        'HOST': tmpPostgres.hostname,
+        'PORT': 5432,
+    },
 }
 
 
@@ -134,3 +148,5 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media/')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 JWT_PRIVATE_KEY = 'cbd372e00d9ea767fe60dfa86c08443a7d63896e5549b215d179fc9f5e8d25a5'
+
+DATABASE_ROUTERS = ['apiFaceId.routers.ReportesRouter']

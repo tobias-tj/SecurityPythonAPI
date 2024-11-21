@@ -8,3 +8,14 @@ class Face(models.Model):
 
     def __str__(self):
         return self.document_id
+
+
+class Reportes(models.Model):
+    created_id = models.IntegerField()  # Relacionado con Examenes_Usuarios.id
+    imagenes_base64 = models.JSONField()  # Para imágenes en formato base64
+    tipo_incidencia = models.TextField()  # Tipo de incidencia
+    fecha_captura = models.DateTimeField(auto_now_add=True)  # Fecha de captura
+
+    class Meta:
+        app_label = 'reportes'  # Asegura que el router lo detecte
+        db_table = 'reportes'  # Nombre exacto de la tabla en Neon
