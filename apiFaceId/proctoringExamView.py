@@ -41,21 +41,17 @@ class ProctoringView(APIView):
                 {'error': 'No se ha encontrado el archivo de codificación para el documento de identidad.'}, status=500)
         known_face_encoding = np.load(known_face_encoding_path, allow_pickle=True)
 
-        # Inicializar contadores y lista para incidencias específicas
-        incidencias = {
-            "no_face_detected": [],
-            "multiple_faces_detected": [],
-            "identity_mismatch": [],
-            "low_image_quality": [],
-            "consecutive_no_faces": 0,
+        # Diccionario para registrar si ocurrió cada incidencia
+        incidencias_detectadas = {
+            "no_face_detected": False,
+            "multiple_faces_detected": False,
+            "identity_mismatch": False,
+            "low_image_quality": False,
         }
 
-        # Variables auxiliares para detectar imágenes consecutivas sin rostro
+        # Procesar las imágenes
         no_face_detected_count = 0
         max_consecutive_no_face = 3  # Umbral de imágenes consecutivas sin rostro
-
-        # Lista para guardar las imágenes relacionadas con incidencias
-        imagenes_base64 = []
 
         for image_data in image_data_list:
             try:
@@ -70,58 +66,43 @@ class ProctoringView(APIView):
                 gray_image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
                 laplacian_var = cv2.Laplacian(gray_image, cv2.CV_64F).var()
                 if laplacian_var < 100:  # Umbral para nitidez
-                    incidencias["low_image_quality"].append("Imagen con baja calidad")
-                    imagenes_base64.append(image_data)  # Guardar imagen con baja calidad
+                    incidencias_detectadas["low_image_quality"] = True
 
                 face_encodings = face_recognition.face_encodings(image)
 
                 # Verificar si no hay rostros detectados
                 if len(face_encodings) == 0:
                     no_face_detected_count += 1
-                    incidencias["no_face_detected"].append("No se detectó un rostro en esta imagen")
-                    imagenes_base64.append(image_data)  # Guardar imagen sin rostro
+                    incidencias_detectadas["no_face_detected"] = True
 
-                    # Alertar si hay muchas imágenes consecutivas sin un rostro
                     if no_face_detected_count > max_consecutive_no_face:
-                        incidencias["consecutive_no_faces"] += 1
-                        incidencias["no_face_detected"].append(
-                            "Se detectaron múltiples imágenes consecutivas sin rostro")
+                        incidencias_detectadas["no_face_detected"] = True
                 else:
-                    no_face_detected_count = 0  # Reseteamos el contador si se detecta un rostro
+                    no_face_detected_count = 0  # Resetear el contador si se detecta un rostro
 
                     # Verificar si hay más de un rostro
                     if len(face_encodings) > 1:
-                        incidencias["multiple_faces_detected"].append("Se detectaron múltiples rostros en la imagen")
-                        imagenes_base64.append(image_data)  # Guardar imagen con múltiples rostros
+                        incidencias_detectadas["multiple_faces_detected"] = True
                     else:
                         # Comparar la cara detectada con la conocida
                         face_encoding = face_encodings[0]
                         match = face_recognition.compare_faces([known_face_encoding], face_encoding, tolerance=0.6)
                         if not match[0]:
-                            incidencias["identity_mismatch"].append("La identidad no coincide con el rostro conocido")
-                            imagenes_base64.append(image_data)  # Guardar imagen con identidad no coincidente
+                            incidencias_detectadas["identity_mismatch"] = True
 
             except Exception as e:
                 print(f"Error procesando la imagen: {str(e)}")
-                incidencias["no_face_detected"].append("Error procesando la imagen")
-                imagenes_base64.append(image_data)  # Guardar imagen con error procesando
+                incidencias_detectadas["no_face_detected"] = True
 
-        # Evaluar si más de la mitad de las imágenes tienen problemas
-        total_images = len(image_data_list)
-        problematic_images = (
-                len(incidencias["no_face_detected"]) +
-                len(incidencias["multiple_faces_detected"]) +
-                len(incidencias["identity_mismatch"]) +
-                len(incidencias["low_image_quality"])
-        )
+        # Generar una lista con las incidencias detectadas
+        incidencias_resumidas = [key for key, value in incidencias_detectadas.items() if value]
 
-        # Evaluar el resultado, pero mantener una respuesta genérica para el cliente
-        if problematic_images > total_images / 2:
-            # Guardar el reporte en la base de datos Neon si más de la mitad tienen incidencias
+        # Si hay incidencias, guardarlas en la base de datos
+        if incidencias_resumidas:
             Reportes.objects.create(
                 created_id=created_id,
-                imagenes_base64=imagenes_base64,  # Guardar las imágenes con incidencias
-                tipo_incidencia=str(incidencias),  # Guardar la información de las incidencias
+                imagenes_base64=image_data_list,
+                tipo_incidencia=str(incidencias_resumidas),
                 fecha_captura=timezone.now()
             )
             return JsonResponse({'success': True, 'message': 'Reporte guardado debido a incidencias'}, status=200)
