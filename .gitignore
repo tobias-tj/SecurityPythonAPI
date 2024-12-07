@@ -28,6 +28,12 @@ MANIFEST
 .env/
 .env/*
 .env
+
+.face_encodings/*
+.face_encodings/
+.media/faces/*
+.media/faces/
+.media/*
 # Virtual environments
 env/
 venv/
