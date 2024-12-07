@@ -99,12 +99,14 @@ class ProctoringView(APIView):
 
         # Si hay incidencias, guardarlas en la base de datos
         if incidencias_resumidas:
-            Reportes.objects.create(
-                created_id=created_id,
-                imagenes_base64=image_data_list,
-                tipo_incidencia=str(incidencias_resumidas),
-                fecha_captura=timezone.now()
-            )
+            # Guardar cada incidencia detectada individualmente
+            for incidencia in incidencias_resumidas:
+                Reportes.objects.create(
+                    created_id=created_id,
+                    imagenes_base64=image_data_list,
+                    tipo_incidencia=incidencia,
+                    fecha_captura=timezone.now()
+                )
             return JsonResponse({'success': True, 'message': 'Reporte guardado debido a incidencias'}, status=200)
 
         # Respuesta genérica para el cliente
