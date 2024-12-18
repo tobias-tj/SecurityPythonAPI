@@ -22,6 +22,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copiar el resto del proyecto
 COPY . /app/
 
+RUN python manage.py migrate
 # Exponer el puerto que usará Django
 EXPOSE 8000
 

@@ -71,6 +71,7 @@ class ProctoringView(APIView):
                 face_encodings = face_recognition.face_encodings(image)
 
                 # Verificar si no hay rostros detectados
+                # TODO: Puede ser que no face detected no funcione porque tenemos este faceEncoding
                 if len(face_encodings) == 0:
                     no_face_detected_count += 1
                     incidencias_detectadas["no_face_detected"] = True
