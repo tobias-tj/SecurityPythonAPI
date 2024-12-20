@@ -12,7 +12,7 @@ class Face(models.Model):
 
 class Reportes(models.Model):
     created_id = models.IntegerField()  # Relacionado con Examenes_Usuarios.id
-    imagenes_base64 = models.JSONField()  # Para imágenes en formato base64
+    imagenes_base64 = models.TextField()  # Para imágenes en formato base64
     tipo_incidencia = models.TextField()  # Tipo de incidencia
     fecha_captura = models.DateTimeField(auto_now_add=True)  # Fecha de captura
 

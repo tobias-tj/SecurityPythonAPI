@@ -58,7 +58,7 @@ class FaceValidationView(APIView):
             if results[0]:  # Si las caras coinciden
                 return JsonResponse({'success': True, 'message': 'Login successful'}, status=200)
             else:
-                return JsonResponse({'success': False, 'message': 'La cara no coincide con la registrada.'}, status=401)
+                return JsonResponse({'success': False, 'error': 'La cara no coincide con la registrada.'}, status=401)
 
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
