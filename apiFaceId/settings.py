@@ -127,7 +127,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'America/Asuncion'
 
 USE_I18N = True
 
@@ -147,6 +147,6 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media/')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-JWT_PRIVATE_KEY = 'cbd372e00d9ea767fe60dfa86c08443a7d63896e5549b215d179fc9f5e8d25a5'
+JWT_PRIVATE_KEY = os.getenv("JWT_KEY")
 
 DATABASE_ROUTERS = ['apiFaceId.routers.ReportesRouter']

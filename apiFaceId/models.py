@@ -1,4 +1,6 @@
 from django.db import models
+from django.utils import timezone
+
 
 class Face(models.Model):
     face_id = models.CharField(max_length=255, unique=True)
@@ -14,7 +16,7 @@ class Reportes(models.Model):
     created_id = models.IntegerField()  # Relacionado con Examenes_Usuarios.id
     imagenes_base64 = models.TextField()  # Para imágenes en formato base64
     tipo_incidencia = models.TextField()  # Tipo de incidencia
-    fecha_captura = models.DateTimeField(auto_now_add=True)  # Fecha de captura
+    fecha_captura = models.DateTimeField(default=timezone.now)  # Fecha de captura
 
     class Meta:
         app_label = 'reportes'  # Asegura que el router lo detecte

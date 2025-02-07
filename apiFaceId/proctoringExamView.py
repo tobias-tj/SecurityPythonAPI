@@ -1,3 +1,4 @@
+from django.utils.timezone import localtime
 import face_recognition
 import numpy as np
 import os
@@ -94,7 +95,7 @@ class ProctoringView(APIView):
                         created_id=created_id,
                         imagenes_base64=image_data,  # Guardar la imagen con incidencia
                         tipo_incidencia=incidencia,  # Guardar una incidencia individualmente
-                        fecha_captura=timezone.now()
+                        fecha_captura=localtime(timezone.now())
                     )
 
 
