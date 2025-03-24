@@ -78,7 +78,7 @@ TEMPLATES = [
 ]
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
+    "http://161.35.53.140:5173",
 ]
 
 WSGI_APPLICATION = 'apiFaceId.wsgi.application'
