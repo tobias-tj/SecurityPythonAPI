@@ -25,9 +25,7 @@ wheels/
 *.egg
 MANIFEST
 
-.env/
-.env/*
-.env
+
 
 .face_encodings/*
 .face_encodings/
