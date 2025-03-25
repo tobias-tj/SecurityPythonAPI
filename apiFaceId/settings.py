@@ -79,7 +79,7 @@ TEMPLATES = [
 
 CORS_ALLOWED_ORIGINS = [
     "http://161.35.53.140:5173",
-    "http://161.35.53.140/faceId/validation-face/"
+    "http://161.35.53.140"
 ]
 
 WSGI_APPLICATION = 'apiFaceId.wsgi.application'
