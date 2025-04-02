@@ -14,6 +14,9 @@ from pathlib import Path
 from os import getenv
 from urllib.parse import urlparse
 from dotenv import load_dotenv
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -123,6 +126,24 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
+
+CLOUDINARY = {
+    'cloud_name': os.getenv("CLOUD_FULL_NAME"),
+    'api_key': os.getenv("CLOUD_API_KEY"),
+    'api_secret': os.getenv("CLOUD_SECRET_KEY"),
+    'folder': 'proctorguard',
+    'upload_preset': 'unsigned_upload',
+    'base_url': 'https://res.cloudinary.com/dxw29ge49/image/upload'
+}
+
+# Configuración global
+cloudinary.config(
+    cloud_name=CLOUDINARY['cloud_name'],
+    api_key=CLOUDINARY['api_key'],
+    api_secret=CLOUDINARY['api_secret'],
+    base_url=CLOUDINARY['base_url'],
+    secure=True
+)
 
 
 # Internationalization

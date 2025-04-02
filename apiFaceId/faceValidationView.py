@@ -1,7 +1,10 @@
+import tempfile
+
 import face_recognition
 import numpy as np
 import os
 import jwt
+import requests
 from django.conf import settings
 from django.http import JsonResponse
 from rest_framework.views import APIView
@@ -23,7 +26,6 @@ class FaceValidationView(APIView):
         try:
             decoded_token = jwt.decode(token, settings.JWT_PRIVATE_KEY, algorithms=["HS256"])
             document_id = decoded_token.get("userId")
-            print(document_id)
             if not document_id:
                 return JsonResponse({'error': 'El token no contiene el documento de identidad.'}, status=401)
         except InvalidTokenError:
@@ -31,34 +33,70 @@ class FaceValidationView(APIView):
 
         try:
             # Cargar la imagen y codificar la cara
-            image = face_recognition.load_image_file(image_file)
-            face_encodings = face_recognition.face_encodings(image)
+            uploaded_img = face_recognition.load_image_file(image_file)
+            uploaded_face_encodings = face_recognition.face_encodings(uploaded_img)
 
-            if len(face_encodings) == 0:
-                return JsonResponse({'error': 'No se ha detectado ninguna cara en la imagen.'}, status=400)
+            if len(uploaded_face_encodings) == 0:
+                return JsonResponse(
+                    {'error': 'No se detectó ninguna cara en la imagen enviada.'},
+                    status=400
+                )
 
-            face_encoding = face_encodings[0]  # Usar la primera cara detectada
+            uploaded_encoding = uploaded_face_encodings[0]
 
-            # Verificar si el document_id está registrado
-            existing_face = Face.objects.filter(document_id=document_id).first()
-            if not existing_face:
-                return JsonResponse({'error': 'No se ha encontrado un registro con ese documento de identidad.'}, status=404)
+            # 2. Obtener imagen de referencia de Cloudinary
+            cloudinary_url = f"{settings.CLOUDINARY['base_url']}/{settings.CLOUDINARY['folder']}/user_{document_id}"
+            print(cloudinary_url)
 
-            # Obtener la ruta del archivo de codificación de la cara
-            known_face_encoding_path = existing_face.encoding_path  # Usa el campo encoding_path
+            # Descargar imagen temporalmente
+            with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False ) as temp_file:
+                # Descargar imagen desde Cloudinary
+                response = requests.get(cloudinary_url)
+                if response.status_code != 200:
+                    return JsonResponse(
+                        {'error': 'No se encontró la imagen de referencia en Cloudinary.'},
+                        status=404
+                    )
 
-            # Verificar si el archivo de codificación de la cara existe
-            if not os.path.exists(known_face_encoding_path):
-                return JsonResponse({'error': 'No se ha encontrado el archivo de codificación para el documento de identidad.'}, status=500)
+                temp_file.write(response.content)
+                temp_file.flush()
 
-            # Cargar la codificación de la cara registrada y comparar
-            known_face_encoding = np.load(known_face_encoding_path, allow_pickle=True)
-            results = face_recognition.compare_faces([known_face_encoding], face_encoding, tolerance=0.5)
+                # Procesar imagen de referencia
+                reference_img = face_recognition.load_image_file(temp_file.name)
+                reference_face_encodings = face_recognition.face_encodings(reference_img)
 
-            if results[0]:  # Si las caras coinciden
-                return JsonResponse({'success': True, 'message': 'Login successful'}, status=200)
-            else:
-                return JsonResponse({'success': False, 'error': 'La cara no coincide con la registrada.'}, status=401)
+                if len(reference_face_encodings) == 0:
+                    return JsonResponse(
+                        {'error': 'No se detectó ninguna cara en la imagen de referencia.'},
+                        status=500
+                    )
+
+                reference_encoding = reference_face_encodings[0]
+
+                # 3. Comparar las caras
+                results = face_recognition.compare_faces(
+                    [reference_encoding],
+                    uploaded_encoding,
+                    tolerance=0.5
+                )
+
+                # Limpiar el archivo temporal si existe
+                if 'temp_file' in locals() and os.path.exists(temp_file.name):
+                    try:
+                        os.unlink(temp_file.name)
+                    except:
+                        pass
+
+                if results[0]:
+                    return JsonResponse(
+                        {'success': True, 'message': 'Autenticación facial exitosa.'},
+                        status=200
+                    )
+                else:
+                    return JsonResponse(
+                        {'success': False, 'error': 'La cara no coincide con la registrada.'},
+                        status=401
+                    )
 
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
