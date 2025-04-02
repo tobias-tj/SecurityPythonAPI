@@ -1,14 +1,12 @@
 import tempfile
 
 import face_recognition
-import numpy as np
 import os
 import jwt
 import requests
 from django.conf import settings
 from django.http import JsonResponse
 from rest_framework.views import APIView
-from .models import Face
 from jwt.exceptions import InvalidTokenError
 
 
@@ -21,11 +19,13 @@ class FaceValidationView(APIView):
 
         image_file = request.FILES['image']
         token = request.data['token']
+        connection_db= ''
 
         # Decodificar el token para obtener el document_id
         try:
             decoded_token = jwt.decode(token, settings.JWT_PRIVATE_KEY, algorithms=["HS256"])
             document_id = decoded_token.get("userId")
+            connection_db= decoded_token.get("connectionDb")
             if not document_id:
                 return JsonResponse({'error': 'El token no contiene el documento de identidad.'}, status=401)
         except InvalidTokenError:
@@ -77,7 +77,7 @@ class FaceValidationView(APIView):
                 results = face_recognition.compare_faces(
                     [reference_encoding],
                     uploaded_encoding,
-                    tolerance=0.5
+                    tolerance=0.6
                 )
 
                 # Limpiar el archivo temporal si existe
