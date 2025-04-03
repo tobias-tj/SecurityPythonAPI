@@ -1,18 +1,19 @@
-from django.utils.timezone import localtime
+from datetime import datetime
+
+import requests
 import face_recognition
 import numpy as np
-import os
 import jwt
 import cv2
 from django.conf import settings
 from django.http import JsonResponse
 from rest_framework.views import APIView
-from .models import Face, Reportes
+
+from .dynamic_db import DynamicDbConnection
 from jwt.exceptions import InvalidTokenError
 import base64
 from io import BytesIO
 from PIL import Image
-from django.utils import timezone
 
 class ProctoringView(APIView):
     def post(self, request):
@@ -22,87 +23,100 @@ class ProctoringView(APIView):
         image_data_list = request.data['images']
         token = request.data['token']
         created_id = request.data['createdId']
+        db_connection = None
 
         try:
             decoded_token = jwt.decode(token, settings.JWT_PRIVATE_KEY, algorithms=["HS256"])
             document_id = decoded_token.get("userId")
+            connection_db = decoded_token.get("connectionDb")
             if not document_id:
                 return JsonResponse({'error': 'El token no contiene un documento de identidad válido.'}, status=401)
         except InvalidTokenError:
             return JsonResponse({'error': 'Token inválido o expirado.'}, status=401)
 
-        existing_face = Face.objects.filter(document_id=document_id).first()
-        if not existing_face:
-            return JsonResponse({'error': 'No se ha encontrado un registro con ese documento de identidad.'},
-                                status=404)
+        try:
+            # Inicializar conexión dinámica
+            db_connection = DynamicDbConnection(connection_db)
+            db_connection.initialize_pool()
 
-        known_face_encoding_path = existing_face.encoding_path
-        if not os.path.exists(known_face_encoding_path):
-            return JsonResponse(
-                {'error': 'No se ha encontrado el archivo de codificación para el documento de identidad.'}, status=500)
-        known_face_encoding = np.load(known_face_encoding_path, allow_pickle=True)
-        #
-        # # Diccionario para registrar si ocurrió cada incidencia
-        # incidencias_detectadas = {
-        #     "no_face_detected": False,
-        #     "multiple_faces_detected": False,
-        #     "identity_mismatch": False,
-        #     "low_image_quality": False,
-        # }
-        #
-        # # Procesar las imágenes
-        # no_face_detected_count = 0
-        # max_consecutive_no_face = 3  # Umbral de imágenes consecutivas sin rostro
+            # 1. Obtener imagen de referencia desde Cloudinary
+            cloudinary_url = f"{settings.CLOUDINARY['base_url']}/{settings.CLOUDINARY['folder']}/user_{document_id}"
+            response = requests.get(cloudinary_url)
 
-        for image_data in image_data_list:
-            try:
-                header, encoded = image_data.split(';base64,')
-                img_bytes = base64.b64decode(encoded)
-                image = np.array(Image.open(BytesIO(img_bytes)))
-
-                if image.shape[2] == 4:
-                    image = cv2.cvtColor(image, cv2.COLOR_RGBA2RGB)
-
-                # Evaluar la nitidez de la imagen
-                gray_image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
-                laplacian_var = cv2.Laplacian(gray_image, cv2.CV_64F).var()
-
-                # Inicializar incidencias
-                incidencias = []
-
-                if laplacian_var < 100:  # Umbral para nitidez
-                    incidencias.append("low_image_quality")
-
-                face_encodings = face_recognition.face_encodings(image)
-
-                # Verificar si no hay rostros detectados
-                # TODO: Puede ser que no face detected no funcione porque tenemos este faceEncoding
-                if len(face_encodings) == 0:
-                    incidencias.append("no_face_detected")
-                elif len(face_encodings) > 1:  # Múltiples rostros detectados
-                    incidencias.append("multiple_faces_detected")
-                else:
-                    # Comparar la cara detectada con la conocida
-                    face_encoding = face_encodings[0]
-                    match = face_recognition.compare_faces([known_face_encoding], face_encoding, tolerance=0.6)
-                    if not match[0]:
-                        incidencias.append("identity_mismatch")
-
-                # Guardar incidencias una por una
-                for incidencia in incidencias:
-                    print(incidencia)
-                    Reportes.objects.create(
-                        created_id=created_id,
-                        imagenes_base64=image_data,  # Guardar la imagen con incidencia
-                        tipo_incidencia=incidencia,  # Guardar una incidencia individualmente
-                        fecha_captura=localtime(timezone.now())
-                    )
+            if response.status_code != 200:
+                return JsonResponse(
+                    {'error': 'No se encontró la imagen de referencia en Cloudinary.'},
+                    status=404
+                )
 
 
-            except Exception as e:
-                print(f"Error procesando la imagen: {str(e)}")
+            # Procesar imagen de referencia
+            reference_img = face_recognition.load_image_file(BytesIO(response.content))
+            reference_face_encodings = face_recognition.face_encodings(reference_img)
 
-            return JsonResponse({'success': True, 'message': 'Reporte guardado debido a incidencias'}, status=200)
+            if not reference_face_encodings:
+                return JsonResponse(
+                    {'error': 'No se detectó ninguna cara en la imagen de referencia.'},
+                    status=500
+                )
 
-        # Respuesta genérica para el cliente
-        return JsonResponse({'success': True, 'message': 'Proceso capturado'}, status=200)
+            known_face_encoding = reference_face_encodings[0]
+
+
+            # 2. Procesar imágenes recibidas
+            for image_data in image_data_list:
+                try:
+                    # Decodificar imagen base64
+                    header, encoded = image_data.split(';base64,')
+                    img_bytes = base64.b64decode(encoded)
+                    image = np.array(Image.open(BytesIO(img_bytes)))
+
+                    # Convertir RGBA a RGB si es necesario
+                    if image.shape[2] == 4:
+                        image = cv2.cvtColor(image, cv2.COLOR_RGBA2RGB)
+
+                    # Evaluar calidad de imagen
+                    gray_image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+                    laplacian_var = cv2.Laplacian(gray_image, cv2.CV_64F).var()
+
+                    incidencias = []
+                    if laplacian_var < 100:
+                        incidencias.append("low_image_quality")
+
+                    # Detección de rostros
+                    face_encodings = face_recognition.face_encodings(image)
+
+                    if len(face_encodings) == 0:
+                        incidencias.append("no_face_detected")
+                    elif len(face_encodings) > 1:
+                        incidencias.append("multiple_faces_detected")
+                    else:
+                        # Comparación facial
+                        match = face_recognition.compare_faces(
+                            [known_face_encoding],
+                            face_encodings[0],
+                            tolerance=0.6
+                        )
+                        if not match[0]:
+                            incidencias.append("identity_mismatch")
+
+                    print(incidencias)
+                    # Registrar incidencias en la base de datos dinámica
+                    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    for incidencia in incidencias:
+                        db_connection.execute_query(
+                            "INSERT INTO reportes (created_id, imagenes_base64, tipo_incidencia, fecha_captura) VALUES (%s, %s, %s, %s)",
+                            (created_id, image_data, incidencia, timestamp)
+                        )
+
+                except Exception as e:
+                    print(f"Error procesando imagen: {str(e)}")
+                    continue
+
+                return JsonResponse({'success': True, 'message': 'Procesamiento completado'}, status=200)
+
+        except Exception as e:
+            return JsonResponse({'error': f'Error en el procesamiento: {str(e)}'}, status=500)
+        finally:
+            if db_connection:
+                db_connection.close()
