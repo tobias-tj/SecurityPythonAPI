@@ -29,6 +29,7 @@ class ProctoringView(APIView):
             decoded_token = jwt.decode(token, settings.JWT_PRIVATE_KEY, algorithms=["HS256"])
             document_id = decoded_token.get("userId")
             connection_db = decoded_token.get("connectionDb")
+            name_university = decoded_token.get("universityName")
             if not document_id:
                 return JsonResponse({'error': 'El token no contiene un documento de identidad válido.'}, status=401)
         except InvalidTokenError:
@@ -39,8 +40,14 @@ class ProctoringView(APIView):
             db_connection = DynamicDbConnection(connection_db)
             db_connection.initialize_pool()
 
+            # Normalizar nombre de universidad (sin espacios ni caracteres raros)
+            safe_university_name = name_university.strip().replace(" ", "_").lower()
+
+            # Concatenar carpeta principal con subcarpeta de la universidad
+            cloudinary_folder = f"{settings.CLOUDINARY['folder']}/{safe_university_name}"
+
             # 1. Obtener imagen de referencia desde Cloudinary
-            cloudinary_url = f"{settings.CLOUDINARY['base_url']}/{settings.CLOUDINARY['folder']}/user_{document_id}"
+            cloudinary_url = f"{settings.CLOUDINARY['base_url']}/{cloudinary_folder}/user_{document_id}"
             response = requests.get(cloudinary_url)
 
             if response.status_code != 200:

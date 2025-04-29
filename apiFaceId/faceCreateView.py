@@ -33,6 +33,7 @@ class FaceCreateView(APIView):
         try:
             decoded_token = jwt.decode(token, settings.JWT_PRIVATE_KEY, algorithms=["HS256"])
             id_file = decoded_token.get("userId")
+            name_university = decoded_token.get("universityName")
         except InvalidTokenError:
             return JsonResponse(
                 {'error': 'Token inválido o expirado.'},
@@ -81,9 +82,15 @@ class FaceCreateView(APIView):
                 # Generar un nombre de archivo único basado en el ID del usuario
                 filename = f"user_{id_file}"
 
+                # Normalizar nombre de universidad (sin espacios ni caracteres raros)
+                safe_university_name = name_university.strip().replace(" ", "_").lower()
+
+                # Concatenar carpeta principal con subcarpeta de la universidad
+                cloudinary_folder = f"{settings.CLOUDINARY['folder']}/{safe_university_name}"
+
                 upload_result = cloudinary.uploader.upload(
                     image_file,
-                    folder=settings.CLOUDINARY['folder'],
+                    folder=cloudinary_folder,
                     upload_preset=settings.CLOUDINARY.get('upload_preset'),
                     resource_type="image",
                     public_id=filename
