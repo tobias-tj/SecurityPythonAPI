@@ -87,7 +87,7 @@ class ProctoringView(APIView):
                     laplacian_var = cv2.Laplacian(gray_image, cv2.CV_64F).var()
 
                     incidencias = []
-                    if laplacian_var < 100:
+                    if laplacian_var < 40:
                         incidencias.append("low_image_quality")
 
                     # Detección de rostros

@@ -53,7 +53,7 @@ class FaceCreateView(APIView):
             # 3.2. Validar nitidez (Laplacian variance)
             gray_image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
             laplacian_var = cv2.Laplacian(gray_image, cv2.CV_64F).var()
-            if laplacian_var < 70:
+            if laplacian_var < 40:
                 incidencias.append("low_image_quality")
 
             # 3.3. Validar caras
