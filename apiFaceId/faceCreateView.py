@@ -8,6 +8,8 @@ from rest_framework.views import APIView
 from jwt.exceptions import InvalidTokenError
 from rest_framework import status
 
+from apiFaceId.dynamic_db import DynamicDbConnection
+
 
 class FaceCreateView(APIView):
     def post(self, request):
@@ -34,6 +36,7 @@ class FaceCreateView(APIView):
             decoded_token = jwt.decode(token, settings.JWT_PRIVATE_KEY, algorithms=["HS256"])
             id_file = decoded_token.get("userId")
             name_university = decoded_token.get("universityName")
+            connection_db = decoded_token.get("connectionDb")
         except InvalidTokenError:
             return JsonResponse(
                 {'error': 'Token inválido o expirado.'},
@@ -42,6 +45,9 @@ class FaceCreateView(APIView):
 
         # 3. Procesar imagen y validaciones
         try:
+            # Inicializar conexión dinámica
+            db_connection = DynamicDbConnection(connection_db)
+            db_connection.initialize_pool()
             # Leer imagen
             image = face_recognition.load_image_file(image_file)
             incidencias = []
@@ -101,13 +107,17 @@ class FaceCreateView(APIView):
                     # ]
                 )
 
+                # ✅ Actualizamos face_id y la validación
+                update_query = "UPDATE usuarios SET is_student_valid = TRUE, face_id = %s WHERE id = %s"
+                db_connection.execute_query(update_query, params=(upload_result['public_id'], id_file))
+
                 # 6. Retornar éxito con la URL de Cloudinary
                 return JsonResponse(
                     {
                         'status': 'success',
-                        'message': 'La imagen cumple con todos los requisitos.',
-                        'image_url': upload_result['secure_url'],
-                        'public_id': upload_result['public_id']
+                        'message': 'La imagen cumple con todos los requisitos.'
+                        # 'image_url': upload_result['secure_url'],
+                        # 'public_id': upload_result['public_id']
                     },
                     status=status.HTTP_201_CREATED
                 )

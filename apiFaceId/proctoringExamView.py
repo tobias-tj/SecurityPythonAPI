@@ -120,7 +120,7 @@ class ProctoringView(APIView):
                     print(f"Error procesando imagen: {str(e)}")
                     continue
 
-                return JsonResponse({'success': True, 'message': 'Procesamiento completado'}, status=200)
+            return JsonResponse({'success': True, 'message': 'Procesamiento completado'}, status=200)
 
         except Exception as e:
             return JsonResponse({'error': f'Error en el procesamiento: {str(e)}'}, status=500)
