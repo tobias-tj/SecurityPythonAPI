@@ -25,6 +25,7 @@ class FaceValidationView(APIView):
             decoded_token = jwt.decode(token, settings.JWT_PRIVATE_KEY, algorithms=["HS256"])
             document_id = decoded_token.get("userId")
             connection_db= decoded_token.get("connectionDb")
+            name_university = decoded_token.get("universityName")
             if not document_id:
                 return JsonResponse({'error': 'El token no contiene el documento de identidad.'}, status=401)
         except InvalidTokenError:
@@ -43,8 +44,14 @@ class FaceValidationView(APIView):
 
             uploaded_encoding = uploaded_face_encodings[0]
 
+            # Normalizar nombre de universidad (sin espacios ni caracteres raros)
+            safe_university_name = name_university.strip().replace(" ", "_").lower()
+
+            # Concatenar carpeta principal con subcarpeta de la universidad
+            cloudinary_folder = f"{settings.CLOUDINARY['folder']}/{safe_university_name}"
+
             # 2. Obtener imagen de referencia de Cloudinary
-            cloudinary_url = f"{settings.CLOUDINARY['base_url']}/{settings.CLOUDINARY['folder']}/user_{document_id}"
+            cloudinary_url = f"{settings.CLOUDINARY['base_url']}/{cloudinary_folder}/user_{document_id}"
             print(cloudinary_url)
 
             # Descargar imagen temporalmente

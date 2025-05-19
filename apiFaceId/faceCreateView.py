@@ -7,6 +7,9 @@ from django.http import JsonResponse
 from rest_framework.views import APIView
 from jwt.exceptions import InvalidTokenError
 from rest_framework import status
+from apiFaceId.dynamic_db import DynamicDbConnection
+
+
 
 
 class FaceCreateView(APIView):
@@ -34,6 +37,8 @@ class FaceCreateView(APIView):
         try:
             decoded_token = jwt.decode(token, settings.JWT_PRIVATE_KEY, algorithms=["HS256"])
             id_file = decoded_token.get("userId")
+            name_university = decoded_token.get("universityName")
+            connection_db = decoded_token.get("connectionDb")
         except InvalidTokenError:
             return JsonResponse(
                 {'error': 'Token inválido o expirado.'},
@@ -41,6 +46,9 @@ class FaceCreateView(APIView):
             )
 
         try:
+            # Inicializar conexión dinámica
+            db_connection = DynamicDbConnection(connection_db)
+            db_connection.initialize_pool()
             # Leer imagen
             image = face_recognition.load_image_file(image_file)
             incidencias = []
@@ -52,7 +60,7 @@ class FaceCreateView(APIView):
             # 3.2. Validar nitidez (Laplacian variance)
             gray_image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
             laplacian_var = cv2.Laplacian(gray_image, cv2.CV_64F).var()
-            if laplacian_var < 70:
+            if laplacian_var < 40:
                 incidencias.append("low_image_quality")
 
             # 3.3. Validar caras
@@ -79,9 +87,15 @@ class FaceCreateView(APIView):
                 # Generar un nombre de archivo único basado en el ID del usuario
                 filename = f"user_{id_file}"
 
+                # Normalizar nombre de universidad (sin espacios ni caracteres raros)
+                safe_university_name = name_university.strip().replace(" ", "_").lower()
+
+                # Concatenar carpeta principal con subcarpeta de la universidad
+                cloudinary_folder = f"{settings.CLOUDINARY['folder']}/{safe_university_name}"
+
                 upload_result = cloudinary.uploader.upload(
                     image_file,
-                    folder=settings.CLOUDINARY['folder'],
+                    folder=cloudinary_folder,
                     upload_preset=settings.CLOUDINARY.get('upload_preset'),
                     resource_type="image",
                     public_id=filename
@@ -92,13 +106,17 @@ class FaceCreateView(APIView):
                     # ]
                 )
 
+                # ✅ Actualizamos face_id y la validación
+                update_query = "UPDATE usuarios SET is_student_valid = TRUE, face_id = %s WHERE id = %s"
+                db_connection.execute_query(update_query, params=(upload_result['public_id'], id_file))
+
                 # 6. Retornar éxito con la URL de Cloudinary
                 return JsonResponse(
                     {
                         'status': 'success',
                         'message': 'La imagen cumple con todos los requisitos.',
-                        'image_url': upload_result['secure_url'],
-                        'public_id': upload_result['public_id']
+                        # 'image_url': upload_result['secure_url'],
+                        # 'public_id': upload_result['public_id']
                     },
                     status=status.HTTP_201_CREATED
                 )
