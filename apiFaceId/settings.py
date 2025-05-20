@@ -31,7 +31,7 @@ SECRET_KEY = 'django-insecure-1#4o1oi8&$z(3vd7%fyu+fg(1v%99nb)n*-0m174^kq4tkn0ik
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = ["161.35.53.140", "localhost", "127.0.0.1"]
+ALLOWED_HOSTS = ["161.35.53.140", "localhost", "127.0.0.1", "api.yvagacore.com", "proctorguard.yvagacore.com"]
 
 load_dotenv()
 
@@ -82,7 +82,8 @@ TEMPLATES = [
 
 CORS_ALLOWED_ORIGINS = [
     "http://161.35.53.140:5173",
-    "http://161.35.53.140"
+    "http://161.35.53.140",
+    "https://proctorguard.yvagacore.com"
 ]
 
 WSGI_APPLICATION = 'apiFaceId.wsgi.application'
